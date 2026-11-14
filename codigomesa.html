@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0F766E">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>MOVA - Mesa Ergonômica Inteligente</title>
+    <!-- Tailwind CSS CDN (protótipo) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons (versão fixa para não quebrar com atualizações) -->
+    <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            primary: '#0F766E',
+                            secondary: '#1F2937',
+                            wood: '#D4803A',
+                            bgLight: '#F8FAFC',
+                            bgDark: '#0B0F14',
+                            accentRed: '#EF4444',
+                        }
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root { --ease: cubic-bezier(.22, 1, .36, 1); --spring: cubic-bezier(.34, 1.56, .64, 1); }
+        body { -webkit-tap-highlight-color: transparent; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Moldura de celular só aparece no computador. No celular o app ocupa a tela toda. */
+        .mobile-frame {
+            max-width: 412px;
+            height: min(846px, calc(100vh - 32px));
+            border-radius: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, .35), 0 0 0 12px #1f2937;
+        }
+        @media (max-width: 480px) {
+            body { padding: 0 !important; }
+            .mobile-frame { max-width: none; height: 100dvh; border-radius: 0; box-shadow: none; border: 0 !important; }
+            .fake-statusbar { display: none !important; }
+        }
+
+        /* ---------- SPLASH ---------- */
+        .splash-bg { background: linear-gradient(160deg, #F4F3F0 0%, #E4E2DD 100%); }
+        .dark .splash-bg { background: linear-gradient(160deg, #14181D 0%, #0B0F14 100%); }
+        .draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 1s var(--ease) forwards; animation-delay: var(--d, 0s); }
+        @keyframes draw { to { stroke-dashoffset: 0; } }
+        .logo-arrow { animation: bob 2.4s ease-in-out 1.8s infinite; }
+        @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+        .wordmark span { display: inline-block; opacity: 0; animation: letter .8s var(--ease) forwards; }
+        .wordmark span:nth-child(1) { animation-delay: .55s; }
+        .wordmark span:nth-child(2) { animation-delay: .65s; }
+        .wordmark span:nth-child(3) { animation-delay: .75s; }
+        .wordmark span:nth-child(4) { animation-delay: .85s; }
+        @keyframes letter { from { opacity: 0; transform: translateY(10px); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
+        .fade-up { opacity: 0; animation: fadeUp .9s var(--ease) forwards; animation-delay: var(--d, 0s); }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+        .desk-rise { animation: deskRise 1.9s var(--ease) .7s both; }
+        @keyframes deskRise { from { transform: translateY(48px); } to { transform: translateY(0); } }
+        .splash-out { animation: splashOut .65s var(--ease) forwards; pointer-events: none; }
+        @keyframes splashOut { to { opacity: 0; transform: scale(1.04); } }
+
+        /* ---------- TELAS ---------- */
+        .screen:not(.hidden) > * { animation: rise .55s var(--ease) both; }
+        .screen:not(.hidden) > *:nth-child(2) { animation-delay: .05s; }
+        .screen:not(.hidden) > *:nth-child(3) { animation-delay: .10s; }
+        .screen:not(.hidden) > *:nth-child(4) { animation-delay: .15s; }
+        .screen:not(.hidden) > *:nth-child(5) { animation-delay: .20s; }
+        .screen:not(.hidden) > *:nth-child(6) { animation-delay: .25s; }
+        .screen:not(.hidden) > *:nth-child(7) { animation-delay: .30s; }
+        @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+        /* ---------- MICROINTERAÇÕES ---------- */
+        .press { transition: transform .18s var(--ease); }
+        .press:active { transform: scale(.95); }
+        .ripple { position: relative; overflow: hidden; }
+        .ripple-ink { position: absolute; border-radius: 50%; background: currentColor; opacity: .18; transform: scale(0); animation: ink .6s var(--ease) forwards; pointer-events: none; }
+        @keyframes ink { to { transform: scale(2.6); opacity: 0; } }
+
+        /* Botões de segurar (Subir / Descer) */
+        .hold-btn { touch-action: none; user-select: none; -webkit-user-select: none; transition: transform .2s var(--ease), background-color .2s, color .2s, box-shadow .3s; }
+        .hold-btn.holding { background: #0D9488 !important; color: #fff !important; transform: scale(.96); box-shadow: 0 0 0 6px rgba(13, 148, 136, .18), 0 10px 25px -8px rgba(13, 148, 136, .6); }
+        .hold-btn.holding svg { animation: nudgeUp .6s ease-in-out infinite; }
+        .hold-btn[data-hold="DOWN"].holding svg { animation-name: nudgeDown; }
+        @keyframes nudgeUp { 50% { transform: translateY(-3px); } }
+        @keyframes nudgeDown { 50% { transform: translateY(3px); } }
+
+        /* Controles “apagados” quando desconectado ou bloqueado */
+        body:not(.is-connected) .needs-conn, body.is-locked .needs-conn { opacity: .45; filter: saturate(.4); }
+
+        /* Medidor */
+        .gauge-progress { transition: stroke-dasharray .2s linear; }
+        .gauge-glow { opacity: 0; transition: opacity .4s; }
+        .gauge-wrap.moving .gauge-glow { opacity: 1; animation: breathe 1.6s ease-in-out infinite; }
+        @keyframes breathe { 50% { transform: scale(1.06); opacity: .6; } }
+
+        /* Radar de busca Bluetooth */
+        .radar { position: absolute; inset: 0; border-radius: 9999px; border: 2px solid currentColor; animation: radar 2.4s var(--ease) infinite; }
+        .radar.r2 { animation-delay: .8s; }
+        .radar.r3 { animation-delay: 1.6s; }
+        @keyframes radar { from { transform: scale(.7); opacity: .7; } to { transform: scale(2.1); opacity: 0; } }
+        .dot-pulse { position: relative; }
+        .dot-pulse::after { content: ''; position: absolute; inset: 0; border-radius: 9999px; background: currentColor; animation: dot 1.6s ease-out infinite; }
+        @keyframes dot { from { transform: scale(1); opacity: .5; } to { transform: scale(2.6); opacity: 0; } }
+
+        /* Toasts, folhas e sobreposições */
+        .toast { animation: toastIn .45s var(--spring) both; }
+        .toast-out { animation: toastOut .3s var(--ease) forwards; }
+        @keyframes toastIn { from { opacity: 0; transform: translateY(-16px) scale(.96); } to { opacity: 1; transform: none; } }
+        @keyframes toastOut { to { opacity: 0; transform: translateY(-10px) scale(.96); } }
+        .sheet { transform: translateY(105%); transition: transform .45s var(--ease); }
+        .sheet.open { transform: none; }
+        .sheet-backdrop { opacity: 0; pointer-events: none; transition: opacity .3s; }
+        .sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+        .overlay-in { animation: fadeIn .3s ease both; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .pop-in { animation: pop .5s var(--spring) both; }
+        @keyframes pop { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: none; } }
+        .shake { animation: shake .55s ease .25s both; }
+        @keyframes shake { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-5px) rotate(-3deg); } 40%, 80% { transform: translateX(5px) rotate(3deg); } }
+        .attn { animation: attn .5s var(--ease); }
+        @keyframes attn { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+        .stop-big { animation: stopPulse 1.6s ease-out infinite; }
+        @keyframes stopPulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, .55); } 100% { box-shadow: 0 0 0 24px rgba(239, 68, 68, 0); } }
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Navegação inferior */
+        .nav-btn { color: #94A3B8; transition: color .3s; }
+        .nav-btn svg { transition: transform .45s var(--spring); }
+        .nav-btn.nav-active { color: #0D9488; font-weight: 600; }
+        .nav-btn.nav-active svg { transform: translateY(-2px) scale(1.12); }
+        #nav-indicator { transition: transform .55s var(--spring); }
+
+        .bar { transition: height .9s var(--ease); }
+
+        /* Interruptor (toggle) */
+        .switch { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; }
+        .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .switch span { position: absolute; inset: 0; background: #CBD5E1; border-radius: 999px; transition: background .25s; cursor: pointer; }
+        .dark .switch span { background: #334155; }
+        .switch span::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .35s var(--spring); }
+        .switch input:checked + span { background: #0D9488; }
+        .switch input:checked + span::after { transform: translateX(18px); }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 font-sans min-h-screen flex items-center justify-center p-0 sm:p-4 text-slate-800 dark:text-slate-100">
+
+<div id="app" class="mobile-frame w-full bg-slate-50 dark:bg-slate-950 flex flex-col overflow-hidden relative border-4 border-slate-700">
+
+    <!-- Barra de status simulada (só no computador) -->
+    <div class="fake-statusbar w-full px-6 pt-3 pb-2 flex justify-between items-center text-xs font-semibold z-50 select-none">
+        <span id="sb-time">9:41</span>
+        <div class="flex items-center space-x-1.5">
+            <i data-lucide="signal" class="w-3.5 h-3.5"></i>
+            <i data-lucide="wifi" class="w-3.5 h-3.5"></i>
+            <i data-lucide="battery" class="w-4 h-4"></i>
+        </div>
+    </div>
+
+    <!-- ================= SPLASH ================= -->
+    <section id="splash" class="absolute inset-0 z-[80] flex flex-col overflow-hidden splash-bg">
+        <div class="px-8 pt-16 relative z-10">
+            <div class="flex items-center gap-4 text-slate-800 dark:text-slate-100">
+                <!-- Logo MOVA: haste com setas (subir/descer) + arco ergonômico -->
+                <svg class="w-14 h-14" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path class="draw" style="--d:.0s" pathLength="1" d="M20 8 H48"/>
+                    <path class="draw" style="--d:.15s" pathLength="1" d="M20 56 H48"/>
+                    <path class="draw" style="--d:.3s" pathLength="1" d="M20 8 C7 20 7 44 20 56"/>
+                    <g class="logo-arrow">
+                        <path class="draw" style="--d:.5s" pathLength="1" d="M34 15 V49"/>
+                        <path class="draw" style="--d:.85s" pathLength="1" d="M28 21 L34 15 L40 21"/>
+                        <path class="draw" style="--d:.85s" pathLength="1" d="M28 43 L34 49 L40 43"/>
+                    </g>
+                </svg>
+                <h1 class="wordmark text-[44px] leading-none font-light tracking-[0.18em]"><span>M</span><span>O</span><span>V</span><span>A</span></h1>
+            </div>
+            <p class="fade-up text-[10px] tracking-[0.32em] text-slate-500 dark:text-slate-400 mt-4" style="--d:1.1s">MESA ERGONÔMICA INTELIGENTE</p>
+            <p class="fade-up text-[26px] font-light text-slate-700 dark:text-slate-200 mt-10 leading-snug" style="--d:1.35s">Ergonomia que<br>se adapta a você.</p>
+        </div>
+
+        <!-- Ilustração da mesa (sobe durante a abertura) -->
+        <div class="flex-1 relative">
+            <svg class="absolute inset-0 w-full h-full" viewBox="0 0 240 300" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+                <defs>
+                    <linearGradient id="sp-wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#DDAA6E"/><stop offset="1" stop-color="#AE7742"/></linearGradient>
+                    <linearGradient id="sp-metal" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#25282D"/><stop offset=".55" stop-color="#3A3F46"/><stop offset="1" stop-color="#1B1E22"/></linearGradient>
+                    <clipPath id="sp-clip"><rect x="0" y="0" width="240" height="282"/></clipPath>
+                </defs>
+                <ellipse cx="80" cy="294" rx="78" ry="5" fill="#000" opacity=".12"/>
+                <g clip-path="url(#sp-clip)"><g class="desk-rise"><rect x="63" y="70" width="30" height="170" fill="url(#sp-metal)"/></g></g>
+                <rect x="58" y="190" width="40" height="96" rx="2" fill="url(#sp-metal)"/>
+                <rect x="18" y="285" width="124" height="9" rx="4.5" fill="#1B1E22"/>
+                <g class="desk-rise">
+                    <rect x="-40" y="58" width="250" height="12" rx="2" fill="#24272C"/>
+                    <rect x="-60" y="40" width="290" height="19" rx="3" fill="url(#sp-wood)"/>
+                    <rect x="-60" y="40" width="290" height="3" fill="#fff" opacity=".28"/>
+                </g>
+                <g class="fade-up" style="--d:2.1s" stroke="#7C8794" stroke-width="1" fill="none" stroke-linecap="round">
+                    <line x1="168" y1="82" x2="168" y2="282"/>
+                    <path d="M164 87 L168 82 L172 87"/><path d="M164 277 L168 282 L172 277"/>
+                    <circle cx="168" cy="182" r="7" fill="#F4F3F0" class="dark:fill-slate-900"/>
+                    <path d="M165.5 180 v4 M170.5 180 v4" stroke-width="1.2"/>
+                </g>
+            </svg>
+        </div>
+
+        <div class="px-8 pb-10 relative z-10">
+            <div class="w-full bg-slate-300/60 dark:bg-slate-800 h-[3px] rounded-full overflow-hidden">
+                <div id="splash-progress" class="bg-teal-600 h-full w-0 transition-all duration-500 ease-out"></div>
+            </div>
+            <p id="splash-status" class="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-3 tracking-wide">Inicializando…</p>
+        </div>
+    </section>
+
+    <!-- Toasts -->
+    <div id="toast-root" class="absolute top-3 inset-x-3 z-[75] flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- ================= TELAS ================= -->
+    <main id="app-screens" class="flex-1 overflow-y-auto relative no-scrollbar pb-24">
+
+        <!-- 1. INÍCIO -->
+        <section id="screen-home" class="screen p-5 space-y-5 hidden">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-bold flex items-center gap-1.5"><span id="greet-text">Olá, Belle</span> <span class="text-lg inline-block origin-[70%_70%]" style="animation: wave 2.4s ease-in-out 1s 2">👋</span></h2>
+                    <button id="conn-pill" data-action="conn-pill" class="press mt-1 inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800">
+                        <span id="conn-dot" class="w-2 h-2 rounded-full bg-slate-400 text-slate-400"></span>
+                        <span id="conn-text">Desconectada</span>
+                        <span id="demo-badge" class="hidden text-[9px] font-bold tracking-wider bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 px-1.5 rounded">DEMO</span>
+                    </button>
+                </div>
+                <button data-action="tab" data-tab="configuracoes" class="press w-10 h-10 rounded-full bg-teal-600 text-white text-sm font-bold flex items-center justify-center shadow-md shadow-teal-600/30">
+                    <span id="home-initials">BA</span>
+                </button>
+            </div>
+
+            <!-- Cartão de conexão (aparece quando desconectado) -->
+            <div id="connect-card" class="bg-gradient-to-br from-teal-700 to-teal-900 text-white rounded-3xl p-5 shadow-lg shadow-teal-900/20 overflow-hidden relative">
+                <div class="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-white/5"></div>
+                <div class="flex items-center gap-4 relative">
+                    <div class="relative w-14 h-14 shrink-0 flex items-center justify-center text-teal-200">
+                        <span class="radar"></span><span class="radar r2"></span><span class="radar r3"></span>
+                        <div id="connect-icon" class="relative w-12 h-12 rounded-full bg-white/10 flex items-center justify-center"><i data-lucide="bluetooth" class="w-6 h-6"></i></div>
+                    </div>
+                    <div class="flex-1">
+                        <h3 id="connect-title" class="font-bold">Conecte sua mesa</h3>
+                        <p id="connect-text" class="text-xs text-teal-100/90 mt-0.5 leading-relaxed">Ligue a mesa MOVA e aproxime o celular.</p>
+                    </div>
+                </div>
+                <div class="flex gap-2 mt-4 relative">
+                    <button id="connect-btn" data-action="connect" class="press ripple flex-1 bg-white text-teal-800 font-bold text-sm py-2.5 rounded-xl flex items-center justify-center gap-2">
+                        <i data-lucide="bluetooth-searching" class="w-4 h-4"></i><span>Conectar mesa</span>
+                    </button>
+                    <button data-action="connect-demo" class="press ripple px-3 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl" title="Testar sem a mesa">Demo</button>
+                </div>
+            </div>
+
+            <!-- Medidor de altura -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col items-center">
+                <div id="gauge-wrap" class="gauge-wrap relative w-48 h-48 flex items-center justify-center">
+                    <div class="gauge-glow absolute inset-6 rounded-full bg-teal-400/20 blur-xl"></div>
+                    <svg class="gauge-svg w-full h-full relative" viewBox="0 0 100 100" style="transform: rotate(135deg)">
+                        <defs><linearGradient id="g-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2DD4BF"/><stop offset="1" stop-color="#0F766E"/></linearGradient></defs>
+                        <circle cx="50" cy="50" r="42" stroke="currentColor" stroke-width="7" class="text-slate-100 dark:text-slate-800" fill="none" stroke-linecap="round" stroke-dasharray="197.92 263.89"/>
+                        <circle id="gauge-progress" class="gauge-progress" cx="50" cy="50" r="42" stroke="url(#g-grad)" stroke-width="7" fill="none" stroke-linecap="round" stroke-dasharray="0 263.89"/>
+                    </svg>
+                    <div class="absolute flex flex-col items-center">
+                        <span id="dash-height" class="text-[44px] leading-none font-extrabold tracking-tight tabular-nums">--,-</span>
+                        <span class="text-[10px] font-semibold text-slate-400 tracking-wider uppercase mt-1">cm • altura atual</span>
+                        <span id="dash-status" class="mt-2 text-[11px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">Desconectada</span>
+                    </div>
+                </div>
+
+                <p class="text-[10px] text-slate-400 mt-1 mb-2 flex items-center gap-1"><i data-lucide="hand" class="w-3 h-3"></i> Segure Subir ou Descer para mover</p>
+
+                <div class="grid grid-cols-3 gap-3 w-full">
+                    <button data-hold="UP" class="hold-btn needs-conn flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 text-teal-700 dark:text-teal-400 font-semibold">
+                        <i data-lucide="arrow-up" class="w-5 h-5 mb-1"></i><span class="text-xs">Subir</span>
+                    </button>
+                    <button data-action="stop" class="press ripple flex flex-col items-center justify-center p-3 rounded-2xl bg-red-50 dark:bg-red-950/40 hover:bg-red-100 text-red-600 font-semibold">
+                        <i data-lucide="square" class="w-5 h-5 mb-1 fill-current"></i><span class="text-xs">Parar</span>
+                    </button>
+                    <button data-hold="DOWN" class="hold-btn needs-conn flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 text-teal-700 dark:text-teal-400 font-semibold">
+                        <i data-lucide="arrow-down" class="w-5 h-5 mb-1"></i><span class="text-xs">Descer</span>
+                    </button>
+                </div>
+
+                <div class="flex justify-between items-center w-full mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 text-xs">
+                    <button data-action="goto-sit" class="needs-conn press flex-1 flex flex-col items-center p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <span class="text-slate-400 mb-0.5 flex items-center gap-1"><i data-lucide="armchair" class="w-3 h-3"></i> Sentado</span>
+                        <span class="font-bold text-slate-700 dark:text-slate-200"><span id="home-sit-h">74</span> cm</span>
+                    </button>
+                    <div class="w-px h-6 bg-slate-200 dark:bg-slate-800"></div>
+                    <button data-action="goto-stand" class="needs-conn press flex-1 flex flex-col items-center p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <span class="text-slate-400 mb-0.5 flex items-center gap-1"><i data-lucide="person-standing" class="w-3 h-3"></i> Em pé</span>
+                        <span class="font-bold text-slate-700 dark:text-slate-200"><span id="home-stand-h">105</span> cm</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modo atual -->
+            <button data-action="tab" data-tab="ergonomia" class="press w-full text-left bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div id="mode-icon" class="p-3 bg-teal-50 dark:bg-teal-950/50 rounded-xl text-teal-600 dark:text-teal-400"><i data-lucide="armchair" class="w-6 h-6"></i></div>
+                    <div>
+                        <span class="text-xs text-slate-400 font-medium block">Seu modo atual</span>
+                        <h4 id="mode-title" class="font-bold text-sm">—</h4>
+                        <span id="mode-time" class="text-xs text-slate-500">Conecte a mesa para acompanhar</span>
+                    </div>
+                </div>
+                <i data-lucide="chevron-right" class="w-5 h-5 text-slate-400"></i>
+            </button>
+
+            <!-- Atalhos rápidos: Sensor VL53L0X & Conexão -->
+            <div class="grid grid-cols-2 gap-3">
+                <button data-action="tab" data-tab="sensores" class="press text-left bg-white dark:bg-slate-900 rounded-2xl p-3.5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                    <div id="home-prox-icon" class="p-2.5 bg-teal-50 dark:bg-teal-950/50 rounded-xl text-teal-600 dark:text-teal-400">
+                        <i data-lucide="radar" class="w-5 h-5"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <span class="text-[10px] text-slate-400 font-medium block">Sensor VL53L0X</span>
+                        <span id="home-prox-text" class="text-xs font-bold block truncate">Área livre</span>
+                    </div>
+                </button>
+                <button data-action="tab" data-tab="conexao" class="press text-left bg-white dark:bg-slate-900 rounded-2xl p-3.5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                    <div class="p-2.5 bg-teal-50 dark:bg-teal-950/50 rounded-xl text-teal-600 dark:text-teal-400">
+                        <i data-lucide="bluetooth" class="w-5 h-5"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <span class="text-[10px] text-slate-400 font-medium block">Minha Mesa</span>
+                        <span id="home-desk-name" class="text-xs font-bold block truncate">MOVA-001</span>
+                    </div>
+                </button>
+            </div>
+        </section>
+
+        <!-- 2. CONTROLE -->
+        <section id="screen-controle" class="screen p-5 space-y-5 hidden">
+            <h2 class="text-xl font-bold">Controle de altura</h2>
+
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex gap-4">
+                <div class="flex-1 space-y-4">
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Altura da mesa</span>
+                        <div class="flex items-baseline gap-1 mt-1">
+                            <span id="ctrl-height" class="text-4xl font-extrabold tracking-tight tabular-nums">--,-</span>
+                            <span class="text-slate-500 font-medium">cm</span>
+                        </div>
+                        <span id="ctrl-status" class="text-[11px] font-semibold text-slate-500">Desconectada</span>
+                    </div>
+                    <div class="space-y-2">
+                        <button data-hold="UP" class="hold-btn needs-conn w-full py-3 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-center gap-2 font-semibold text-sm">
+                            <i data-lucide="arrow-up" class="w-4 h-4"></i> Segure para subir
+                        </button>
+                        <button data-hold="DOWN" class="hold-btn needs-conn w-full py-3 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-center gap-2 font-semibold text-sm">
+                            <i data-lucide="arrow-down" class="w-4 h-4"></i> Segure para descer
+                        </button>
+                        <button data-action="stop" class="press ripple w-full py-3 px-4 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 flex items-center justify-center gap-2 font-semibold text-sm">
+                            <i data-lucide="square" class="w-4 h-4 fill-current"></i> Parar
+                        </button>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 font-medium">Ajuste fino</span>
+                        <div class="needs-conn flex items-center justify-between bg-slate-50 dark:bg-slate-800 rounded-xl p-1.5 mt-1">
+                            <button data-action="nudge" data-value="-0.5" class="press w-9 h-9 rounded-lg bg-white dark:bg-slate-700 shadow-sm flex items-center justify-center font-bold">−</button>
+                            <span class="text-xs font-semibold">0,5 cm</span>
+                            <button data-action="nudge" data-value="0.5" class="press w-9 h-9 rounded-lg bg-white dark:bg-slate-700 shadow-sm flex items-center justify-center font-bold">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mesa ao vivo -->
+                <div class="w-28 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-700 relative overflow-hidden">
+                    <svg class="w-full h-full" viewBox="0 0 140 240" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+                        <defs>
+                            <linearGradient id="lv-wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#DDAA6E"/><stop offset="1" stop-color="#AE7742"/></linearGradient>
+                            <linearGradient id="lv-metal" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2A2E33"/><stop offset=".55" stop-color="#40464E"/><stop offset="1" stop-color="#1E2126"/></linearGradient>
+                            <clipPath id="lv-clip"><rect x="0" y="0" width="140" height="222"/></clipPath>
+                        </defs>
+                        <!-- régua -->
+                        <g stroke="#94A3B8" stroke-width="1">
+                            <line x1="118" y1="40" x2="118" y2="100"/>
+                            <line x1="114" y1="40" x2="122" y2="40"/><line x1="114" y1="70" x2="120" y2="70"/><line x1="114" y1="100" x2="122" y2="100"/>
+                        </g>
+                        <text id="lv-max" x="126" y="43" font-size="9" fill="#94A3B8" font-weight="700">110</text>
+                        <text id="lv-min" x="126" y="103" font-size="9" fill="#94A3B8" font-weight="700">60</text>
+                        <line id="lv-target" x1="0" x2="124" y1="0" y2="0" stroke="#14B8A6" stroke-width="1.2" stroke-dasharray="3 3" opacity="0"/>
+                        <g clip-path="url(#lv-clip)"><g class="live-desk"><rect x="43" y="52" width="22" height="160" fill="url(#lv-metal)"/></g></g>
+                        <rect x="39" y="150" width="30" height="72" rx="1.5" fill="url(#lv-metal)"/>
+                        <rect x="12" y="221" width="84" height="7" rx="3.5" fill="#1B1E22"/>
+                        <g class="live-desk">
+                            <rect x="8" y="48" width="92" height="7" rx="1.5" fill="#24272C"/>
+                            <rect x="2" y="36" width="104" height="13" rx="2.5" fill="url(#lv-wood)"/>
+                            <rect x="2" y="36" width="104" height="2" fill="#fff" opacity=".3"/>
+                            <path d="M110 42 l6 -4 v8 z" fill="#0D9488"/>
+                        </g>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Calculadora NR-17 -->
+            <div class="bg-teal-900 text-white rounded-3xl p-5 shadow-sm space-y-3">
+                <div class="flex items-center gap-2 border-b border-teal-800 pb-2">
+                    <i data-lucide="calculator" class="w-5 h-5 text-teal-300"></i>
+                    <h3 class="font-bold text-sm text-teal-50">Calculadora NR-17 / ISO 9241</h3>
+                </div>
+                <p class="text-xs text-teal-200 leading-relaxed">Calcule a altura recomendada para o seu corpo.</p>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[11px] font-semibold text-teal-300 block mb-1" for="user-height-input">Sua altura (cm)</label>
+                        <input type="number" id="user-height-input" value="170" min="140" max="210" inputmode="numeric" class="w-full bg-teal-950 border border-teal-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-teal-400">
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-semibold text-teal-300 block mb-1" for="user-sole-input">Calçado (cm)</label>
+                        <input type="number" id="user-sole-input" value="2" min="0" max="10" inputmode="numeric" class="w-full bg-teal-950 border border-teal-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-teal-400">
+                    </div>
+                </div>
+                <button data-action="calc" class="press ripple w-full bg-teal-500 hover:bg-teal-400 text-teal-950 font-bold text-xs py-2.5 rounded-xl">Calcular altura ideal</button>
+                <div id="calc-result" class="hidden space-y-2 pt-2 border-t border-teal-800">
+                    <div class="grid grid-cols-2 gap-2 text-center">
+                        <button data-action="calc-go" data-which="sit" class="needs-conn press bg-teal-950/60 p-2 rounded-xl">
+                            <span class="text-[10px] text-teal-300 block">Sentado • toque p/ ir</span>
+                            <span id="calc-sitting" class="text-lg font-bold text-teal-200">72 cm</span>
+                        </button>
+                        <button data-action="calc-go" data-which="stand" class="needs-conn press bg-teal-950/60 p-2 rounded-xl">
+                            <span class="text-[10px] text-teal-300 block">Em pé • toque p/ ir</span>
+                            <span id="calc-standing" class="text-lg font-bold text-teal-200">108 cm</span>
+                        </button>
+                    </div>
+                    <button data-action="calc-save" class="press w-full text-[11px] font-semibold text-teal-200 py-2 rounded-xl border border-teal-700 hover:bg-teal-800/50 flex items-center justify-center gap-1.5">
+                        <i data-lucide="bookmark-plus" class="w-3.5 h-3.5"></i> Usar como minhas alturas padrão
+                    </button>
+                </div>
+            </div>
+
+            <!-- Posições salvas -->
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300">Posições salvas</h3>
+                    <button data-action="save-preset" class="press text-xs font-semibold text-teal-600 flex items-center gap-1"><i data-lucide="plus" class="w-3.5 h-3.5"></i> Salvar atual</button>
+                </div>
+                <div id="preset-list" class="space-y-2"></div>
+            </div>
+        </section>
+
+        <!-- 3. ERGONOMIA -->
+        <section id="screen-ergonomia" class="screen p-5 space-y-5 hidden">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xl font-bold">Sua ergonomia</h2>
+                <div class="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl text-xs font-semibold">
+                    <button data-action="range" data-range="day" class="range-btn px-2.5 py-1 rounded-lg">Hoje</button>
+                    <button data-action="range" data-range="week" class="range-btn px-2.5 py-1 rounded-lg">7 dias</button>
+                    <button data-action="range" data-range="month" class="range-btn px-2.5 py-1 rounded-lg">30 dias</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-1">
+                    <div class="flex items-center gap-2 text-teal-600"><i data-lucide="armchair" class="w-4 h-4"></i><span class="text-xs text-slate-400 font-medium">Tempo sentado</span></div>
+                    <p id="stat-sit" class="text-lg font-extrabold">0 min</p>
+                </div>
+                <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-1">
+                    <div class="flex items-center gap-2 text-indigo-600"><i data-lucide="person-standing" class="w-4 h-4"></i><span class="text-xs text-slate-400 font-medium">Tempo em pé</span></div>
+                    <p id="stat-stand" class="text-lg font-extrabold">0 min</p>
+                </div>
+                <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-1">
+                    <div class="flex items-center gap-2 text-amber-500"><i data-lucide="refresh-cw" class="w-4 h-4"></i><span class="text-xs text-slate-400 font-medium">Alternâncias</span></div>
+                    <p id="stat-switches" class="text-lg font-extrabold">0 vezes</p>
+                </div>
+                <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-1">
+                    <div class="flex items-center gap-2 text-slate-500"><i data-lucide="clock" class="w-4 h-4"></i><span class="text-xs text-slate-400 font-medium">Última mudança</span></div>
+                    <p id="stat-last" class="text-lg font-extrabold">—</p>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 space-y-3">
+                <div class="flex justify-between items-center text-xs">
+                    <span class="font-bold text-slate-700 dark:text-slate-300">Alternância de posições</span>
+                    <div class="flex items-center gap-3">
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-teal-500"></span> Sentado</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-indigo-500"></span> Em pé</span>
+                    </div>
+                </div>
+                <div class="relative">
+                    <div id="chart" class="h-32 flex items-end justify-between gap-1.5 pt-4"></div>
+                    <div id="chart-empty" class="hidden absolute inset-0 flex items-center justify-center text-center text-[11px] text-slate-400 px-6">Ainda sem dados neste período.<br>Use a mesa conectada para começar a acompanhar.</div>
+                </div>
+            </div>
+
+            <div class="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 p-4 rounded-2xl flex items-start gap-3">
+                <div class="p-2 bg-emerald-100 dark:bg-emerald-900 rounded-xl text-emerald-700 dark:text-emerald-300"><i data-lucide="lightbulb" class="w-5 h-5"></i></div>
+                <div>
+                    <h4 class="text-xs font-bold text-emerald-900 dark:text-emerald-200">Dica agora</h4>
+                    <p id="ergo-tip" class="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5 leading-relaxed">—</p>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 space-y-4">
+                <div class="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <i data-lucide="book-open" class="w-5 h-5 text-teal-600"></i>
+                    <h3 class="font-bold text-sm">Manual de uso resumido</h3>
+                </div>
+                <div class="space-y-3 text-xs text-slate-600 dark:text-slate-300">
+                    <div class="space-y-1">
+                        <h4 class="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5"><span class="w-4 h-4 rounded-full bg-teal-100 text-teal-800 text-[10px] flex items-center justify-center font-bold">1</span> Antes de operar</h4>
+                        <p class="pl-5 text-slate-500 dark:text-slate-400">Confira se a mesa está estável, sem peças soltas. Afaste cabos, objetos e partes do corpo da área de movimento.</p>
+                    </div>
+                    <div class="space-y-1">
+                        <h4 class="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5"><span class="w-4 h-4 rounded-full bg-teal-100 text-teal-800 text-[10px] flex items-center justify-center font-bold">2</span> Postura correta (NR-17)</h4>
+                        <ul class="pl-5 space-y-1 list-disc list-inside text-slate-500 dark:text-slate-400">
+                            <li><b>Sentado:</b> pés apoiados, ombros relaxados, antebraços a 90°.</li>
+                            <li><b>Em pé:</b> tampo na altura dos cotovelos, sem travar os joelhos.</li>
+                        </ul>
+                    </div>
+                    <div class="space-y-1">
+                        <h4 class="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5"><span class="w-4 h-4 rounded-full bg-teal-100 text-teal-800 text-[10px] flex items-center justify-center font-bold">3</span> Manutenção e limpeza</h4>
+                        <p class="pl-5 text-slate-500 dark:text-slate-400">Desligue da tomada. Use pano macio levemente úmido. Nunca borrife líquidos sobre motores ou conectores.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. AJUSTES -->
+        <section id="screen-configuracoes" class="screen p-5 space-y-5 hidden">
+            <h2 class="text-xl font-bold">Ajustes</h2>
+
+            <button data-action="edit-profile" class="press w-full text-left bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                <div id="profile-initials" class="w-12 h-12 rounded-full bg-teal-600 text-white font-bold text-lg flex items-center justify-center">BA</div>
+                <div class="flex-1 min-w-0">
+                    <h3 id="profile-name" class="font-bold text-sm truncate">Belle Andrade</h3>
+                    <span id="profile-sub" class="text-xs text-slate-400 truncate block">Usuária</span>
+                </div>
+                <i data-lucide="pencil" class="w-4 h-4 text-slate-400"></i>
+            </button>
+
+            <!-- Conexão, Sensores & Segurança (Telas 7, 8 e 9 do protótipo) -->
+            <div>
+                <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 px-1">Mesa & Diagnóstico</h3>
+                <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800 text-xs font-semibold">
+                    <button data-action="tab" data-tab="conexao" class="press w-full p-4 flex items-center justify-between gap-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <div class="flex items-center gap-3">
+                            <div id="ble-icon" class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><i data-lucide="bluetooth" class="w-4 h-4"></i></div>
+                            <div>
+                                <span class="block">Conexão Bluetooth</span>
+                                <span id="ble-status-text" class="text-[11px] font-normal text-slate-400">Desconectada</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span id="cfg-desk-code" class="text-teal-600 font-semibold">MOVA-001</span>
+                            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+                        </div>
+                    </button>
+
+                    <button data-action="tab" data-tab="sensores" class="press w-full p-4 flex items-center justify-between gap-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-xl bg-teal-50 dark:bg-teal-950/50 flex items-center justify-center text-teal-600"><i data-lucide="radar" class="w-4 h-4"></i></div>
+                            <div>
+                                <span class="block">Sensores da mesa (VL53L0X)</span>
+                                <span id="cfg-sensors-sub" class="text-[11px] font-normal text-slate-400">Proximidade, altura, temperatura e corrente</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span id="cfg-prox-badge" class="text-emerald-600 dark:text-emerald-400 text-[10px] bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded-full">Livre</span>
+                            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+                        </div>
+                    </button>
+
+                    <button data-action="tab" data-tab="seguranca" class="press w-full p-4 flex items-center justify-between gap-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600"><i data-lucide="shield-check" class="w-4 h-4"></i></div>
+                            <div>
+                                <span class="block">Sistema de segurança</span>
+                                <span class="text-[11px] font-normal text-slate-400">Proteções ativas e limites da mesa</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span id="cfg-safety-badge" class="text-emerald-600 dark:text-emerald-400 text-[10px] bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded-full">Ativo</span>
+                            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Segurança -->
+            <div>
+                <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 px-1">Segurança</h3>
+                <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800 text-xs font-semibold">
+                    <div class="p-4 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3"><i data-lucide="lock" class="w-4 h-4 text-slate-500"></i><div><span>Bloquear controles</span><p class="text-[10px] font-normal text-slate-400">Evita movimentos acidentais (ex.: crianças)</p></div></div>
+                        <label class="switch"><input type="checkbox" data-setting="childLock"><span></span></label>
+                    </div>
+                    <div class="p-4 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3"><i data-lucide="shield-check" class="w-4 h-4 text-slate-500"></i><div><span>Confirmar área livre</span><p class="text-[10px] font-normal text-slate-400">Pergunta antes do 1º movimento da sessão</p></div></div>
+                        <label class="switch"><input type="checkbox" data-setting="confirmClearArea"><span></span></label>
+                    </div>
+                    <div class="p-4 space-y-2">
+                        <div class="flex items-center gap-3"><i data-lucide="ruler" class="w-4 h-4 text-slate-500"></i><span>Limites de altura (cm)</span></div>
+                        <div class="grid grid-cols-2 gap-3 pl-7">
+                            <label class="text-[10px] font-normal text-slate-400">Mínimo<input type="number" data-setting="limitMin" step="1" inputmode="numeric" class="mt-1 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-sm text-slate-800 dark:text-slate-100"></label>
+                            <label class="text-[10px] font-normal text-slate-400">Máximo<input type="number" data-setting="limitMax" step="1" inputmode="numeric" class="mt-1 w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-sm text-slate-800 dark:text-slate-100"></label>
+                        </div>
+                    </div>
+                    <div class="p-4 flex items-start gap-3 text-[11px] font-normal text-slate-500 dark:text-slate-400">
+                        <i data-lucide="info" class="w-4 h-4 shrink-0 text-teal-600"></i>
+                        <p>A mesa para sozinha se perder o sinal do app, se travar (obstáculo), se passar do tempo máximo, ou se o app sair da tela.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bem-estar -->
+            <div>
+                <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 px-1">Bem-estar</h3>
+                <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800 text-xs font-semibold">
+                    <div class="p-4 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3"><i data-lucide="bell" class="w-4 h-4 text-slate-500"></i><span>Lembrete de postura</span></div>
+                        <label class="switch"><input type="checkbox" data-setting="reminder"><span></span></label>
+                    </div>
+                    <div class="p-4 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3"><i data-lucide="clock" class="w-4 h-4 text-slate-500"></i><span>Lembrar após sentado por</span></div>
+                        <select data-setting="reminderMin" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs">
+                            <option value="30">30 min</option><option value="45">45 min</option><option value="50">50 min</option><option value="60">60 min</option><option value="90">90 min</option>
+                        </select>
+                    </div>
+                    <div class="p-4 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3"><i data-lucide="vibrate" class="w-4 h-4 text-slate-500"></i><span>Vibração ao tocar</span></div>
+                        <label class="switch"><input type="checkbox" data-setting="haptics"><span></span></label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- App -->
+            <div>
+                <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 px-1">Aplicativo</h3>
+                <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800 text-xs font-semibold">
+                    <div class="p-4 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3"><i data-lucide="moon" class="w-4 h-4 text-slate-500"></i><span>Modo escuro</span></div>
+                        <label class="switch"><input type="checkbox" id="dark-mode-toggle" data-setting="darkMode"><span></span></label>
+                    </div>
+                    <div class="p-4 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3"><i data-lucide="flask-conical" class="w-4 h-4 text-slate-500"></i><div><span>Modo demonstração</span><p class="text-[10px] font-normal text-slate-400">Simula a mesa para testar sem hardware</p></div></div>
+                        <label class="switch"><input type="checkbox" data-setting="demoMode"><span></span></label>
+                    </div>
+                    <button data-action="clear-data" class="w-full p-4 flex items-center gap-3 text-red-500 text-left">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i><span>Apagar dados do app</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-slate-100 dark:bg-slate-800/50 text-[11px] text-slate-500 space-y-1">
+                <p class="font-bold text-slate-700 dark:text-slate-300">MOVA - Protótipo Acadêmico v0.4</p>
+                <p>SENAI Frederico Jacob • Orientador: Célio Monari</p>
+                <p>Equipe: Erik, Isabelle, Julia, Lucas, Lynkon</p>
+            </div>
+        </section>
+
+        <!-- 5. SENSORES (Tela 7 do Protótipo + Sensor VL53L0X) -->
+        <section id="screen-sensores" class="screen p-5 space-y-4 hidden">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <button data-action="tab" data-tab="configuracoes" class="press p-2 -ml-2 rounded-full hover:bg-slate-200/60 dark:hover:bg-slate-800">
+                        <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                    </button>
+                    <h2 class="text-xl font-bold">Sensores</h2>
+                </div>
+                <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400">Tempo real</span>
+            </div>
+
+            <!-- Cartão Principal: Sensor Laser VL53L0X (Proteção de Proximidade / Anti-colisão) -->
+            <div id="sensor-card-vl53" class="rounded-3xl p-4 bg-slate-900 text-white border border-slate-800 shadow-lg space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3.5">
+                        <div id="vl53-icon-wrap" class="w-12 h-12 rounded-full bg-teal-500/15 border border-teal-400/40 flex items-center justify-center text-teal-400">
+                            <i data-lucide="radar" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-semibold text-slate-300">Sensor de proximidade (VL53L0X)</span>
+                            </div>
+                            <p id="vl53-status-text" class="text-sm font-bold text-teal-400 mt-0.5">Livre • Proteção ativa</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span id="vl53-dist-value" class="text-xl font-extrabold tabular-nums">120 cm</span>
+                        <span class="text-[10px] text-slate-400 block">distância</span>
+                    </div>
+                </div>
+
+                <!-- Barra de distância do VL53L0X com linha de bloqueio -->
+                <div class="space-y-1.5 pt-1">
+                    <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden relative">
+                        <div id="vl53-bar" class="h-full bg-teal-400 rounded-full transition-all duration-300" style="width: 85%"></div>
+                    </div>
+                    <div class="flex justify-between items-center text-[10px] text-slate-400">
+                        <span>Zona de bloqueio (&lt; <b id="vl53-min-label" class="text-slate-200">35 cm</b>)</span>
+                        <button id="sim-prox-btn" data-action="sim-prox" class="press text-teal-400 hover:underline font-semibold">Simular pessoa perto</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lista de Sensores (Estilo Escuro do Print 7. Sensores) -->
+            <div class="space-y-3">
+                <!-- Sensor de altura -->
+                <div class="rounded-2xl p-4 bg-slate-900 text-white border border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-11 h-11 rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+                            <i data-lucide="gauge" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-300 block">Sensor de altura</span>
+                            <span id="sens-height-status" class="text-sm font-bold text-teal-400">Normal</span>
+                        </div>
+                    </div>
+                    <span id="sens-height-val" class="text-xs font-semibold text-slate-400 tabular-nums">74,5 cm</span>
+                </div>
+
+                <!-- Sensor de temperatura -->
+                <div class="rounded-2xl p-4 bg-slate-900 text-white border border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-11 h-11 rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+                            <i data-lucide="thermometer" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-300 block">Sensor de temperatura</span>
+                            <span id="sens-temp-status" class="text-sm font-bold text-teal-400">Normal</span>
+                        </div>
+                    </div>
+                    <span class="text-xs text-slate-400">Módulo driver</span>
+                </div>
+
+                <!-- Sensor de corrente -->
+                <div class="rounded-2xl p-4 bg-slate-900 text-white border border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-11 h-11 rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+                            <i data-lucide="zap" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-300 block">Sensor de corrente</span>
+                            <span id="sens-curr-status" class="text-sm font-bold text-teal-400">Normal</span>
+                        </div>
+                    </div>
+                    <span id="sens-curr-val" class="text-xs font-semibold text-slate-400 tabular-nums">0,2 A</span>
+                </div>
+
+                <!-- Motor -->
+                <div class="rounded-2xl p-4 bg-slate-900 text-white border border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-11 h-11 rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+                            <i data-lucide="power" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-300 block">Motor</span>
+                            <span id="sens-motor-status" class="text-sm font-bold text-teal-400">Operacional</span>
+                        </div>
+                    </div>
+                    <span id="sens-motor-sub" class="text-xs text-slate-400">Em espera</span>
+                </div>
+
+                <!-- Sistema de segurança -->
+                <button data-action="tab" data-tab="seguranca" class="press w-full text-left rounded-2xl p-4 bg-slate-900 text-white border border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-11 h-11 rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+                            <i data-lucide="shield-check" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-300 block">Sistema de segurança</span>
+                            <span id="sens-safety-status" class="text-sm font-bold text-teal-400">Ativo</span>
+                        </div>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500"></i>
+                </button>
+
+                <!-- Temperatura atual -->
+                <div class="rounded-2xl p-4 bg-slate-900 text-white border border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-11 h-11 rounded-full bg-slate-800 flex items-center justify-center text-slate-200">
+                            <i data-lucide="thermometer-sun" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs text-slate-400 block">Temperatura atual</span>
+                            <span id="sens-temp-val" class="text-2xl font-extrabold tracking-tight tabular-nums">32°C</span>
+                        </div>
+                    </div>
+                    <span class="text-[11px] text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full font-semibold">Estável</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. CONEXÃO (Tela 8 do Protótipo) -->
+        <section id="screen-conexao" class="screen p-5 space-y-4 hidden">
+            <div class="flex items-center gap-3">
+                <button data-action="tab" data-tab="configuracoes" class="press p-2 -ml-2 rounded-full hover:bg-slate-200/60 dark:hover:bg-slate-800">
+                    <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                </button>
+                <h2 class="text-xl font-bold">Conexão</h2>
+            </div>
+
+            <!-- Cartão da Mesa Conectada -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4">
+                <!-- Ícone da mesa MOVA -->
+                <div class="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                    <svg class="w-11 h-11 text-slate-800 dark:text-slate-100" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M8 22 H56"/>
+                        <path d="M14 27 H50"/>
+                        <path d="M20 27 V46 H14"/>
+                        <path d="M44 27 V38"/>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between">
+                        <h3 id="conn-Alias-title" class="font-bold text-base truncate">Minha Mesa</h3>
+                        <i data-lucide="chevron-up" class="w-4 h-4 text-slate-400"></i>
+                    </div>
+                    <p id="conn-device-code" class="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">MOVA-001</p>
+                    <div class="flex items-center gap-4 mt-2.5 text-xs">
+                        <span id="conn-screen-badge" class="inline-flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-400">
+                            <span id="conn-screen-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                            <span id="conn-screen-state">Conectada</span>
+                        </span>
+                        <span class="inline-flex items-center gap-1 text-slate-400 font-medium">
+                            <i data-lucide="bluetooth" class="w-3.5 h-3.5"></i> Bluetooth
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botões de Ação (Procurar, Desconectar, Renomear) -->
+            <div class="space-y-2.5">
+                <button data-action="connect" class="press ripple w-full py-3.5 px-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center gap-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
+                    <span>Procurar mesa</span>
+                </button>
+                <button id="conn-disconnect-btn" data-action="disconnect-desk" class="press ripple w-full py-3.5 px-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center gap-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm">
+                    <i data-lucide="log-out" class="w-4 h-4 text-slate-500"></i>
+                    <span>Desconectar</span>
+                </button>
+                <button data-action="rename-desk" class="press ripple w-full py-3.5 px-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center gap-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm">
+                    <i data-lucide="pencil" class="w-4 h-4 text-slate-500"></i>
+                    <span>Renomear mesa</span>
+                </button>
+            </div>
+
+            <!-- Status da Conexão (Timeline igual ao Print 8. Conexão) -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 space-y-4">
+                <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200">Status da conexão</h4>
+                <div class="relative pl-1 space-y-5">
+                    <!-- Passo 1: Procurando -->
+                    <div class="flex items-center gap-3.5 relative">
+                        <div id="tl-step-1" class="w-5 h-5 rounded-full flex items-center justify-center bg-slate-800 text-white text-[10px] z-10">
+                            <span class="w-2 h-2 rounded-full bg-current"></span>
+                        </div>
+                        <div id="tl-line-1" class="absolute left-2.5 top-5 w-0.5 h-6 bg-teal-600"></div>
+                        <span id="tl-text-1" class="text-xs text-slate-500 dark:text-slate-400">Procurando...</span>
+                    </div>
+                    <!-- Passo 2: Conectando -->
+                    <div class="flex items-center gap-3.5 relative">
+                        <div id="tl-step-2" class="w-5 h-5 rounded-full flex items-center justify-center bg-emerald-500 text-white text-[10px] z-10">
+                            <span class="w-2 h-2 rounded-full bg-current"></span>
+                        </div>
+                        <div id="tl-line-2" class="absolute left-2.5 top-5 w-0.5 h-6 bg-teal-600"></div>
+                        <span id="tl-text-2" class="text-xs text-slate-500 dark:text-slate-400">Conectando...</span>
+                    </div>
+                    <!-- Passo 3: Conectada -->
+                    <div class="flex items-center gap-3.5 relative">
+                        <div id="tl-step-3" class="w-6 h-6 -ml-0.5 rounded-full flex items-center justify-center bg-teal-700 text-white z-10">
+                            <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                        </div>
+                        <div id="tl-line-3" class="absolute left-2.5 top-6 w-0.5 h-6 bg-slate-200 dark:bg-slate-700"></div>
+                        <span id="tl-text-3" class="text-xs font-bold text-teal-700 dark:text-teal-400">Conectada</span>
+                    </div>
+                    <!-- Passo 4: Conexão perdida -->
+                    <div class="flex items-center gap-3.5 relative">
+                        <div id="tl-step-4" class="w-5 h-5 rounded-full flex items-center justify-center border border-slate-300 dark:border-slate-700 text-slate-400 text-[10px] z-10">!</div>
+                        <span id="tl-text-4" class="text-xs text-slate-400">Conexão perdida</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 7. SISTEMA DE SEGURANÇA (Tela 9 do Protótipo) -->
+        <section id="screen-seguranca" class="screen p-5 space-y-4 hidden">
+            <div class="flex items-center gap-3">
+                <button data-action="tab" data-tab="configuracoes" class="press p-2 -ml-2 rounded-full hover:bg-slate-200/60 dark:hover:bg-slate-800">
+                    <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                </button>
+                <h2 class="text-xl font-bold">Sistema de segurança</h2>
+            </div>
+
+            <!-- Cartão Escudo ATIVO -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col items-center text-center">
+                <div id="safety-hero-icon" class="w-16 h-16 rounded-2xl bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-400 flex items-center justify-center mb-3">
+                    <i data-lucide="shield-check" class="w-10 h-10 stroke-[1.8]"></i>
+                </div>
+                <h3 id="safety-hero-title" class="text-lg font-extrabold tracking-wide text-slate-900 dark:text-white">ATIVO</h3>
+                <p id="safety-hero-sub" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Tudo funcionando corretamente.</p>
+            </div>
+
+            <!-- Lista de itens verificados -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800 text-xs font-semibold">
+                <div class="p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center"><i data-lucide="check" class="w-3 h-3"></i></span>
+                        <span>Limite mínimo de altura</span>
+                    </div>
+                    <span id="safe-min-label" class="text-slate-400 font-normal">60 cm ›</span>
+                </div>
+                <div class="p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center"><i data-lucide="check" class="w-3 h-3"></i></span>
+                        <span>Limite máximo de altura</span>
+                    </div>
+                    <span id="safe-max-label" class="text-slate-400 font-normal">110 cm ›</span>
+                </div>
+                <div class="p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center"><i data-lucide="check" class="w-3 h-3"></i></span>
+                        <span>Proteção contra sobrecarga</span>
+                    </div>
+                    <span class="text-slate-400 font-normal">Ativa ›</span>
+                </div>
+                <div class="p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center"><i data-lucide="check" class="w-3 h-3"></i></span>
+                        <span>Parada de emergência</span>
+                    </div>
+                    <span class="text-slate-400 font-normal">Pronta ›</span>
+                </div>
+                <div class="p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span id="safe-prox-check" class="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center"><i data-lucide="check" class="w-3 h-3"></i></span>
+                        <div>
+                            <span class="block">Detecção de obstáculo e proximidade</span>
+                            <span class="text-[10px] font-normal text-slate-400">Sensor Laser VL53L0X + Watchdog</span>
+                        </div>
+                    </div>
+                    <span id="safe-prox-label" class="text-emerald-600 font-semibold">Livre ›</span>
+                </div>
+            </div>
+
+            <!-- Configurar distância mínima do sensor VL53L0X -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-4 border border-slate-100 dark:border-slate-800 space-y-2">
+                <div class="flex items-center justify-between text-xs font-semibold">
+                    <span class="flex items-center gap-2"><i data-lucide="radar" class="w-4 h-4 text-teal-600"></i> Distância de bloqueio (VL53L0X)</span>
+                    <span id="prox-limit-val" class="text-teal-600 font-bold">35 cm</span>
+                </div>
+                <input type="range" min="15" max="80" step="5" value="35" data-setting="proxMinCm" class="w-full accent-teal-600">
+                <p class="text-[10px] text-slate-400">Se o sensor VL53L0X detectar alguém ou um objeto a menos dessa distância, a mesa bloqueia a subida/descida automaticamente.</p>
+            </div>
+
+            <div class="bg-slate-100 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 rounded-2xl p-4 flex items-center gap-3 text-xs text-slate-500">
+                <i data-lucide="info" class="w-5 h-5 text-slate-400 shrink-0"></i>
+                <span>Sua segurança é a nossa prioridade.</span>
+            </div>
+        </section>
+    </main>
+
+    <!-- ================= MENU INFERIOR ================= -->
+    <nav id="bottom-nav" class="absolute bottom-0 inset-x-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex justify-around items-center pt-2 pb-[max(.5rem,env(safe-area-inset-bottom))] z-30">
+        <span id="nav-indicator" class="absolute top-0 left-0 h-[3px] w-8 rounded-full bg-teal-600"></span>
+        <button data-action="tab" data-tab="home" id="nav-home" class="nav-btn flex flex-col items-center gap-1 text-[11px] w-16"><i data-lucide="house" class="w-5 h-5"></i><span>Início</span></button>
+        <button data-action="tab" data-tab="controle" id="nav-controle" class="nav-btn flex flex-col items-center gap-1 text-[11px] w-16"><i data-lucide="sliders-vertical" class="w-5 h-5"></i><span>Controle</span></button>
+        <button data-action="tab" data-tab="ergonomia" id="nav-ergonomia" class="nav-btn flex flex-col items-center gap-1 text-[11px] w-16"><i data-lucide="activity" class="w-5 h-5"></i><span>Ergonomia</span></button>
+        <button data-action="tab" data-tab="configuracoes" id="nav-configuracoes" class="nav-btn flex flex-col items-center gap-1 text-[11px] w-16"><i data-lucide="settings" class="w-5 h-5"></i><span>Ajustes</span></button>
+    </nav>
+
+    <!-- ================= MOVIMENTO AUTOMÁTICO (ir para altura) ================= -->
+    <div id="motion-overlay" class="absolute inset-0 z-[60] hidden flex-col items-center justify-center p-6 bg-slate-950/85 backdrop-blur-md text-white overlay-in">
+        <div class="relative w-48 h-48 pop-in">
+            <svg viewBox="0 0 100 100" class="w-full h-full -rotate-90">
+                <circle cx="50" cy="50" r="44" stroke="rgba(255,255,255,.1)" stroke-width="5" fill="none"/>
+                <circle id="motion-ring" cx="50" cy="50" r="44" stroke="#2DD4BF" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="276.46" stroke-dashoffset="276.46" style="transition: stroke-dashoffset .2s linear"/>
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                <span id="motion-dir" class="text-teal-300 mb-1"><i data-lucide="arrow-up" class="w-5 h-5"></i></span>
+                <span id="motion-height" class="text-4xl font-extrabold tabular-nums">--,-</span>
+                <span class="text-xs text-slate-300 mt-1">indo para <b id="motion-target" class="text-white">--</b> cm</span>
+            </div>
+        </div>
+        <h3 class="mt-6 font-bold">Ajustando altura…</h3>
+        <p class="text-xs text-slate-300 mt-1 text-center max-w-[240px]">Mantenha a área livre ao redor da mesa. Toque em PARAR a qualquer momento.</p>
+        <button data-action="stop" class="stop-big press mt-8 w-28 h-28 rounded-full bg-red-600 hover:bg-red-700 text-white font-extrabold tracking-wider flex flex-col items-center justify-center gap-1">
+            <i data-lucide="octagon-x" class="w-8 h-8"></i>PARAR
+        </button>
+    </div>
+
+    <!-- ================= ERRO DA MESA ================= -->
+    <div id="error-overlay" class="absolute inset-0 z-[65] hidden items-center justify-center p-6 bg-slate-950/70 backdrop-blur-sm overlay-in">
+        <div class="pop-in w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl p-6 text-center shadow-2xl">
+            <div class="shake mx-auto w-16 h-16 rounded-full bg-red-100 dark:bg-red-950 text-red-600 flex items-center justify-center mb-4"><i data-lucide="triangle-alert" class="w-8 h-8"></i></div>
+            <h3 id="error-title" class="text-lg font-bold">Mesa parada por segurança</h3>
+            <p id="error-text" class="text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed"></p>
+            <p class="text-[10px] text-slate-400 mt-3">Código: <span id="error-code" class="font-mono"></span></p>
+            <button data-action="ack-error" class="press ripple mt-6 w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm py-3 rounded-xl">Verifiquei, liberar a mesa</button>
+        </div>
+    </div>
+
+    <!-- ================= FOLHA (bottom sheet) ================= -->
+    <div id="sheet-backdrop" class="sheet-backdrop absolute inset-0 z-[70] bg-slate-950/50 backdrop-blur-[2px]"></div>
+    <div id="sheet" class="sheet absolute inset-x-0 bottom-0 z-[71] bg-white dark:bg-slate-900 rounded-t-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl">
+        <div class="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-700 mx-auto mb-4"></div>
+        <h3 id="sheet-title" class="text-base font-bold mb-3"></h3>
+        <div id="sheet-body" class="text-sm text-slate-600 dark:text-slate-300"></div>
+        <div id="sheet-actions" class="flex gap-2 mt-5"></div>
+    </div>
+</div>
+
+<style>@keyframes wave { 0%, 60%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(14deg); } 20% { transform: rotate(-8deg); } 40% { transform: rotate(-4deg); } 50% { transform: rotate(10deg); } }</style>
+
+<!-- Lógica do app (conexão BLE, segurança, interface) -->
+<script src="mova.js"></script>
+</body>
+</html>
