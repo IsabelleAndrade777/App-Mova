@@ -387,12 +387,16 @@ let handshakeTimer = null;
 
 function setConn(c) { state.conn = c; renderConn(); }
 
-async function connect(kind = 'ble') {
-    if (['connecting', 'handshake', 'connected'].includes(state.conn)) return;
+async function connect(kind = 'ble', { force = false } = {}) {
+    if (!force && ['connecting', 'handshake', 'connected'].includes(state.conn)) return;
     if (kind === 'ble' && !BleTransport.isSupported()) { showUnsupportedInfo(); return; }
 
     state.reconnectToken++;                      // cancela reconexões antigas
-    if (Link.transport) { try { Link.transport.disconnect(); } catch { } Link.transport = null; }
+    if (Link.transport) {
+        const old = Link.transport;
+        Link.transport = null;                   // evita que o onDisconnect antigo sobrescreva o novo estado
+        try { old.disconnect(); } catch { }
+    }
 
     const T = kind === 'demo' ? DemoTransport : BleTransport;
     const t = new T(handleMessage, manual => onTransportDisconnect(t, manual));
@@ -1404,14 +1408,15 @@ function showUnsupportedInfo() {
 const Actions = {
     tab: el => switchTab(el.dataset.tab),
     connect: () => {
-        if (state.conn === 'unsupported') return showUnsupportedInfo();
-        connect(settings.demoMode ? 'demo' : 'ble');
+        if (!BleTransport.isSupported()) return showUnsupportedInfo();
+        if (settings.demoMode) { settings.demoMode = false; saveSettings(); renderSettings(); }
+        // Sempre abre o seletor Bluetooth real do navegador (desconecta o Demo antes, se estiver ativo)
+        const switchingFromDemo = state.transportKind === 'demo' && state.conn === 'connected';
+        connect('ble', { force: switchingFromDemo });
     },
     'connect-demo': () => {
-        settings.demoMode = true; saveSettings(); renderSettings();
         if (state.conn === 'connected' && state.transportKind === 'demo') return;
-        if (Link.transport) disconnect();
-        setTimeout(() => connect('demo'), Link.transport ? 400 : 0);
+        connect('demo', { force: true });
     },
     'conn-pill': () => {
         switchTab('conexao');
@@ -1537,8 +1542,8 @@ function applySetting(key, el) {
         }
         case 'demoMode':
             settings.demoMode = el.checked;
-            if (Link.transport) disconnect();
-            if (el.checked) setTimeout(() => connect('demo'), 400);
+            if (el.checked) connect('demo', { force: true });
+            else if (Link.transport && state.transportKind === 'demo') disconnect();
             break;
         case 'childLock':
             settings.childLock = el.checked;
